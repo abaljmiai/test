@@ -1,54 +1,32 @@
-from contextlib import contextmanager
-from io import StringIO
-from streamlit.report_thread import REPORT_CONTEXT_ATTR_NAME
-from threading import current_thread
 import streamlit as st
-import sys
+import requests
 
 
-@contextmanager
-def st_redirect(src, dst):
-    placeholder = st.empty()
-    output_func = getattr(placeholder, dst)
+def fetch(session, url):
+    try:
+        result = session.get(url)
+        return result.json()
+    except Exception:
+        return {}
 
-    with StringIO() as buffer:
-        old_write = src.write
 
-        def new_write(b):
-            if getattr(current_thread(), REPORT_CONTEXT_ATTR_NAME, None):
-                buffer.write(b)
-                output_func(buffer.getvalue())
+def main():
+    st.set_page_config(page_title="Example App", page_icon="🤖")
+    st.title("Get Image by Id")
+    session = requests.Session()
+    with st.form("my_form"):
+        index = st.number_input("ID", min_value=0, max_value=100, key="index")
+
+        submitted = st.form_submit_button("Submit")
+
+        if submitted:
+            st.write("Result")
+            data = fetch(session, f"https://picsum.photos/id/{index}/info")
+            if data:
+                st.image(data['download_url'], caption=f"Author: {data['author']}")
             else:
-                old_write(b)
-
-        try:
-            src.write = new_write
-            yield
-        finally:
-            src.write = old_write
+                st.error("Error")
 
 
-@contextmanager
-def st_stdout(dst):
-    with st_redirect(sys.stdout, dst):
-        yield
-
-
-@contextmanager
-def st_stderr(dst):
-    with st_redirect(sys.stderr, dst):
-        yield
-
-
-with st_stdout("code"):
-    print("Prints as st.code()")
-
-with st_stdout("info"):
-    print("Prints as st.info()")
-
-with st_stdout("markdown"):
-    print("Prints as st.markdown()")
-
-with st_stdout("success"), st_stderr("error"):
-    print("You can print regular success messages")
-    print("And you can redirect errors as well at the same time", file=sys.stderr)
+if __name__ == '__main__':
+    main()
